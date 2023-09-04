@@ -1,11 +1,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vproapp
-  labels: 
+  name: vproapp-deployment
+  labels:
     app: vproapp
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: vproapp
@@ -16,14 +16,41 @@ spec:
     spec:
       containers:
       - name: vproapp
-        image: vprofile/vprofileapp:v${BUILD_ID}
+        image: visualpath/vpromultiapp
         ports:
         - name: vproapp-port
           containerPort: 8080
-      initContainers:
-      - name: init-mydb
-        image: busybox
-        command: ['sh', '-c', 'until nslookup vprodb; do echo waiting for mydb; sleep 2; done;']
-      - name: init-memcache
-        image: busybox
-        command: ['sh', '-c', 'until nslookup vprocache01; do echo waiting for mydb; sleep 2; done;']
+        resources:
+          limits:
+            cpu: "1"
+          requests:
+            cpu: 200m
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vproapp-service
+spec:
+  ports:
+  - port: 80
+#    nodePort: 31001
+    targetPort: vproapp-port
+    protocol: TCP
+  selector:
+    app: vproapp
+  type: LoadBalancer
+
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-vprofile-autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: extensions/v1beta1
+    kind: Deployment
+    name: vproapp
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 50
